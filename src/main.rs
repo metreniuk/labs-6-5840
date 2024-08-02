@@ -1,11 +1,11 @@
-mod map_reduce;
 mod map_reduce_apps;
+mod map_reduce_seq;
 
 use clap::Parser;
 use std::{collections::HashMap, fs};
 
-use map_reduce::SequentialMapReduce;
 use map_reduce_apps::WordCount;
+use map_reduce_seq::SequentialMapReduce;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about=None)]

@@ -19,6 +19,7 @@ impl SequentialMapReduce {
     pub fn new(input: Input, mr_app: Box<dyn MapReduceApp>) -> Self {
         Self { input, mr_app }
     }
+
     pub fn run(self) -> Output {
         // println!("input {:?}", self.input.clone());
         let intermediate_key_values =
