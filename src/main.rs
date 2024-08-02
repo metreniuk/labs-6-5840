@@ -1,7 +1,9 @@
+mod common;
 mod map_reduce_apps;
 mod map_reduce_seq;
 
 use clap::Parser;
+use common::MapReduce;
 use std::{collections::HashMap, fs};
 
 use map_reduce_apps::WordCount;
@@ -16,7 +18,8 @@ struct Args {
     output_file: String,
 }
 
-fn main() -> anyhow::Result<(), anyhow::Error> {
+#[tokio::main]
+async fn main() -> anyhow::Result<(), anyhow::Error> {
     let Args {
         output_file,
         input_dir,
@@ -38,7 +41,7 @@ fn main() -> anyhow::Result<(), anyhow::Error> {
 
     let mr = SequentialMapReduce::new(input, Box::new(wc));
 
-    let output = mr.run();
+    let output = mr.run().await;
 
     let mut output_values: Vec<_> = output.into_iter().collect();
 

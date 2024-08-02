@@ -1,4 +1,4 @@
-use crate::map_reduce::MapReduceApp;
+use crate::common::MapReduceApp;
 use regex::Regex;
 
 pub struct WordCount {}

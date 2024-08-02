@@ -1,14 +1,8 @@
 use std::collections::HashMap;
 
-/// {filename: file_contents}
-type Input = HashMap<String, String>;
-/// {key: reduce_output}
-type Output = HashMap<String, String>;
+use async_trait::async_trait;
 
-pub trait MapReduceApp {
-    fn map(&self, filename: String, contents: String) -> Vec<(String, String)>;
-    fn reduce(&self, key: String, values: Vec<String>) -> String;
-}
+use crate::common::{Input, MapReduce, MapReduceApp, Output};
 
 pub struct SequentialMapReduce {
     input: Input,
@@ -16,11 +10,7 @@ pub struct SequentialMapReduce {
 }
 
 impl SequentialMapReduce {
-    pub fn new(input: Input, mr_app: Box<dyn MapReduceApp>) -> Self {
-        Self { input, mr_app }
-    }
-
-    pub fn run(self) -> Output {
+    pub fn run_sync(self) -> Output {
         // println!("input {:?}", self.input.clone());
         let intermediate_key_values =
             self.input
@@ -48,5 +38,16 @@ impl SequentialMapReduce {
             .collect();
 
         output
+    }
+}
+
+#[async_trait]
+impl MapReduce for SequentialMapReduce {
+    fn new(input: Input, mr_app: Box<dyn MapReduceApp>) -> Self {
+        Self { input, mr_app }
+    }
+
+    async fn run(self) -> Output {
+        self.run_sync()
     }
 }
