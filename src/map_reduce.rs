@@ -1,14 +1,9 @@
 use std::collections::HashMap;
 
-type IKeyValue = (String, String);
 /// {filename: file_contents}
 type Input = HashMap<String, String>;
 /// {key: reduce_output}
 type Output = HashMap<String, String>;
-/// (filename string, contents string) -> (Key, IValue)
-type MapFn = dyn Fn(String, String) -> Vec<IKeyValue>;
-/// (key string, values string[]) -> OValue
-type ReduceFn = dyn Fn(String, Vec<String>) -> String;
 
 pub trait MapReduceApp {
     fn map(&self, filename: String, contents: String) -> Vec<(String, String)>;

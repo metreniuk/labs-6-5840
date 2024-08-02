@@ -7,3 +7,5 @@ api.key
 # Added by cargo
 
 /target
+
+output.txt

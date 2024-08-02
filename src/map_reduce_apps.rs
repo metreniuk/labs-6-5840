@@ -5,7 +5,7 @@ pub struct WordCount {}
 
 impl MapReduceApp for WordCount {
     fn map(&self, _filename: String, contents: String) -> Vec<(String, String)> {
-        let words_regex = Regex::new(r"\b\w+\b").expect("invalid regex");
+        let words_regex = Regex::new(r"\b[a-zA-Z0-9]+\b").expect("invalid regex");
         let kva: Vec<_> = words_regex
             .find_iter(&contents)
             .into_iter()
