@@ -2,7 +2,9 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 
 /// {filename: file_contents}
-pub type Input = HashMap<String, String>;
+// pub type Input = Vec<String>;
+/// dir
+pub type Input = String;
 /// {key: reduce_output}
 pub type Output = HashMap<String, String>;
 
@@ -14,5 +16,5 @@ pub trait MapReduceApp: Send {
 #[async_trait]
 pub trait MapReduce {
     fn new(input: Input, mr_app: Box<dyn MapReduceApp>) -> Self;
-    async fn run(self) -> Output;
+    async fn run(self) -> anyhow::Result<()>;
 }
