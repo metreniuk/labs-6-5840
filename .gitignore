@@ -9,3 +9,5 @@ api.key
 /target
 
 output.txt
+/output
+output-*.txt

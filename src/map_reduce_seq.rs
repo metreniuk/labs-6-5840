@@ -76,7 +76,7 @@ impl MapReduce for SequentialMapReduce {
         for (key, o_value) in output_values {
             lines.push_str(&format!("{} {}\n", key, o_value));
         }
-        let output_file = "output.txt";
+        let output_file = "output-seq.txt";
         fs::write(output_file, lines)?;
         println!("write to: {:?}", output_file);
         Ok(())

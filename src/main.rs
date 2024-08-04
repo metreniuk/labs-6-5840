@@ -7,6 +7,7 @@ use clap::Parser;
 use common::MapReduce;
 
 use map_reduce_apps::WordCount;
+use map_reduce_parallel::ParallelMapReduce;
 use map_reduce_seq::SequentialMapReduce;
 
 #[derive(Parser, Debug)]
@@ -24,8 +25,16 @@ async fn main() -> anyhow::Result<(), anyhow::Error> {
 
     let wc = WordCount {};
 
-    let mr = SequentialMapReduce::new(input_dir, Box::new(wc));
+    let mr_seq = SequentialMapReduce::new(input_dir.clone(), Box::new(wc));
 
-    mr.run().await?;
+    println!("[start] Sequential MR");
+    mr_seq.run().await?;
+    println!("[end] Sequential MR");
+
+    let wc_2 = WordCount {};
+    let mr_parallel = ParallelMapReduce::new(input_dir, Box::new(wc_2));
+    println!("[start] Parallel MR");
+    mr_parallel.run().await?;
+    println!("[end] Parallel MR");
     Ok(())
 }

@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::common::{Input, MapReduce, MapReduceApp};
 
-struct ParallelMapReduce {
+pub struct ParallelMapReduce {
     input: Input,
     mr_app: Box<dyn MapReduceApp>,
 }
@@ -51,6 +51,36 @@ impl Coordinator {
             worker.run(Task::Reduce(worker.id.clone()), &mr_app)?;
         }
 
+        self.combine_all_out_files()?;
+
+        Ok(())
+    }
+
+    fn combine_all_out_files(&self) -> anyhow::Result<()> {
+        let files = read_files_from_dir("output/output".to_string())?;
+        let mut kva: HashMap<String, usize> = HashMap::new();
+        for (_, path) in files {
+            let f_contents = fs::read_to_string(path)?;
+            f_contents
+                .lines()
+                .map(|line| line.split_once(" ").unwrap())
+                .for_each(|(k, v)| {
+                    let entry = kva.entry(k.to_string()).or_insert(0);
+                    *entry += v.parse::<usize>().unwrap();
+                });
+        }
+        let mut output_values: Vec<_> = kva.into_iter().collect();
+
+        output_values.sort_by(|a, b| b.1.cmp(&a.1));
+
+        let mut lines = String::from("");
+        for (key, value) in output_values {
+            lines.push_str(&format!("{} {}\n", key, value));
+        }
+        let output_file = "output-parallel.txt";
+        fs::write(&output_file, lines)?;
+        println!("reduce write: {}", output_file);
+
         Ok(())
     }
 }
@@ -64,20 +94,32 @@ impl Worker {
         match task {
             Task::Map(filename, path) => {
                 let contents = fs::read_to_string(&path)?;
+                println!("map read: {}", path);
                 let key_values = mr_app.map(filename.clone(), contents);
-                let i_path_str = self.construct_file_path(filename, self.id.clone());
+                let i_path_str = self.construct_i_file_path(filename, self.id.clone());
                 let i_path = Path::new(&i_path_str);
                 let lines = key_values.iter().fold(String::from(""), |mut acc, (k, v)| {
                     acc.push_str(&format!("{},{}\n", k, v));
                     acc
                 });
+                fs::create_dir_all(self.construct_worker_dir(self.id.clone()))?;
                 fs::write(i_path, lines)?;
+                println!("map write: {}", i_path.to_str().unwrap());
             }
             Task::Reduce(src_worker_id) => {
-                let filenames = read_files_from_dir(src_worker_id.clone())?;
+                let filenames =
+                    read_files_from_dir(self.construct_worker_dir(src_worker_id.clone()))?;
+                println!(
+                    "reduce read: {}",
+                    self.construct_worker_dir(src_worker_id.clone())
+                );
                 let (filename, _) = filenames.first().unwrap().clone();
+                println!(
+                    "reduce read 2: {}",
+                    self.construct_i_file_path(filename.clone(), src_worker_id.clone())
+                );
                 let contents =
-                    fs::read_to_string(self.construct_file_path(filename, src_worker_id))?;
+                    fs::read_to_string(self.construct_i_file_path(filename, src_worker_id))?;
                 let intermediate_key_values: Vec<(&str, &str)> = contents
                     .lines()
                     .map(|line| line.split_once(",").unwrap())
@@ -108,15 +150,25 @@ impl Worker {
                 for (key, o_value) in output_values {
                     lines.push_str(&format!("{} {}\n", key, o_value));
                 }
-                let output_file = format!("output-{}", Uuid::new_v4());
+                let output_file = self.construct_o_file_path(Uuid::new_v4().to_string());
+                fs::create_dir_all("output/output")?;
                 fs::write(&output_file, lines)?;
+                println!("reduce write: {}", output_file);
             }
         };
         Ok(())
     }
 
-    fn construct_file_path(&self, filename: String, worker_id: String) -> String {
-        format!("{}/{}", worker_id, filename)
+    fn construct_i_file_path(&self, filename: String, worker_id: String) -> String {
+        format!("{}/{}", self.construct_worker_dir(worker_id), filename)
+    }
+
+    fn construct_o_file_path(&self, id: String) -> String {
+        format!("output/output/{}", id)
+    }
+
+    fn construct_worker_dir(&self, worker_id: String) -> String {
+        format!("output/worker-{}", worker_id)
     }
 }
 
