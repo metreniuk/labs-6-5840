@@ -1,0 +1,3 @@
+- introduce KV struct with write, read, serialize, deserialize
+- add a sort step that takes input files and sorts by keys in R chunks
+- make workers take tasks from a queue

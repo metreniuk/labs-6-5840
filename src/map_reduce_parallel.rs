@@ -1,6 +1,13 @@
-use std::{collections::HashMap, fs, path::Path};
-
 use async_trait::async_trait;
+use futures;
+use std::{
+    collections::HashMap,
+    fs,
+    path::Path,
+    sync::mpsc,
+    thread::{self, sleep, JoinHandle},
+    time::Duration,
+};
 use uuid::Uuid;
 
 use crate::common::{Input, MapReduce, MapReduceApp};
@@ -18,7 +25,7 @@ impl MapReduce for ParallelMapReduce {
 
     async fn run(self) -> anyhow::Result<()> {
         let coord = Coordinator {};
-        coord.start(self.input, 2, self.mr_app)?;
+        coord.start_naive(self.input, 2, self.mr_app)?;
 
         Ok(())
     }
@@ -27,7 +34,7 @@ impl MapReduce for ParallelMapReduce {
 struct Coordinator {}
 
 impl Coordinator {
-    pub fn start(
+    pub fn start_naive(
         &self,
         dir: String,
         _workers_count: u32,
@@ -43,11 +50,47 @@ impl Coordinator {
             workers.push(worker);
         }
 
-        for (worker, (filename, path)) in workers.iter().zip(files.iter()) {
+        for (worker, (filename, path)) in workers.iter_mut().zip(files.iter()) {
             worker.run(Task::Map(filename.clone(), path.clone()), &mr_app)?;
         }
 
-        for worker in workers {
+        for mut worker in workers {
+            worker.run(Task::Reduce(worker.id.clone()), &mr_app)?;
+        }
+
+        self.combine_all_out_files()?;
+
+        Ok(())
+    }
+
+    pub fn start_channels(
+        &self,
+        dir: String,
+        workers_count: usize,
+        mr_app: Box<dyn MapReduceApp>,
+    ) -> anyhow::Result<()> {
+        let files = read_files_from_dir(dir)?;
+        let mut workers: Vec<Worker> = vec![];
+
+        for _ in 0..workers_count {
+            let worker = Worker {
+                id: Uuid::new_v4().to_string(),
+            };
+            workers.push(worker);
+        }
+
+        let (tx, mut rx) = mpsc::channel();
+
+        let handle = thread::spawn(move || {
+            for (filename, path) in files.iter() {
+                tx.send(Task::Map(filename.clone(), path.clone()));
+            }
+            drop(tx);
+        });
+
+        handle.join().unwrap();
+
+        for mut worker in workers {
             worker.run(Task::Reduce(worker.id.clone()), &mr_app)?;
         }
 
@@ -87,6 +130,7 @@ impl Coordinator {
 
 struct Worker {
     id: String,
+    // thread: Option<JoinHandle<()>>,
 }
 
 impl Worker {
@@ -102,6 +146,7 @@ impl Worker {
                     acc.push_str(&format!("{},{}\n", k, v));
                     acc
                 });
+                sleep(Duration::from_secs(1));
                 fs::create_dir_all(self.construct_worker_dir(self.id.clone()))?;
                 fs::write(i_path, lines)?;
                 println!("map write: {}", i_path.to_str().unwrap());
@@ -151,6 +196,9 @@ impl Worker {
                     lines.push_str(&format!("{} {}\n", key, o_value));
                 }
                 let output_file = self.construct_o_file_path(Uuid::new_v4().to_string());
+
+                sleep(Duration::from_secs(1));
+
                 fs::create_dir_all("output/output")?;
                 fs::write(&output_file, lines)?;
                 println!("reduce write: {}", output_file);
@@ -170,6 +218,10 @@ impl Worker {
     fn construct_worker_dir(&self, worker_id: String) -> String {
         format!("output/worker-{}", worker_id)
     }
+}
+
+struct ThreadPool {
+    workers: Vec<Worker>,
 }
 
 enum Task {
